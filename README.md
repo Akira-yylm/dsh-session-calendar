@@ -21,28 +21,32 @@
 ### 在 DSH 中安装（推荐）
 
 1. 打开 DSH 侧栏 **插件** → **添加插件**。
-2. 把下面这一行粘进输入框，点安装：
+2. 粘贴包名，点安装：
 
 ```sh
-github:Akira-yylm/dsh-session-calendar#v1.0.3
+@akira-yylm/session-calendar
 ```
 
 3. 装好后插件默认启用；页面提示 `restart-required` 时重启 DSH，再刷新页面。左侧「免费会话」下方就会出现「会话日历」。
 
+从 npm 安装的版本，插件页会显示 **Versions** 区，升级可以直接点 **Update**。
+
 ### 从 GitHub 安装
 
-想让 Plugin Manager 把插件识别为**可更新**的 Git 安装（版本列表里能直接更新），或者想把版本锁死在某个提交上，就把 tag 换成完整的 40 位 commit SHA：
+不想经过 npm、或者想锁死某个提交时，用 GitHub 地址：
 
 ```sh
-github:Akira-yylm/dsh-session-calendar#<40 位完整 commit SHA>
+github:Akira-yylm/dsh-session-calendar#v1.0.4
 ```
 
-写 tag（如 `#v1.0.3`）或分支名也能装，但不会被识别为可更新。某个版本对应的完整 SHA 可以用 `git rev-parse v1.0.3` 查到。
+想让 Plugin Manager 把它识别为**可更新**的 Git 安装，把 tag 换成完整的 40 位 commit SHA（`git rev-parse v1.0.4` 可查）；写 tag 或分支名也能装，但不会跟随更新。
+
+> 中国大陆网络下 Git 直装可能很慢，建议优先用上面的 npm 方式。
 
 ### 用命令安装
 
 ```sh
-dsh plugin --profile <profile> add "github:Akira-yylm/dsh-session-calendar#v1.0.3"
+dsh plugin --profile <profile> add @akira-yylm/session-calendar
 ```
 
 ### 从本地目录安装
@@ -51,9 +55,8 @@ dsh plugin --profile <profile> add "github:Akira-yylm/dsh-session-calendar#v1.0.
 
 ## 升级
 
-第三方 Git 插件没有一键更新：换新版本 = **移除旧版 → 用新 commit 重新装**。
-
-> 若以后发布到 npm，插件页会出现 Versions 区，可直接点 Update。
+- **npm 安装**：插件页出现新版本时点 **Update** 即可。
+- **GitHub 安装**：没有一键更新，换新版本 = 移除旧版 → 用新 commit 重新装。
 
 ## 数据与隐私
 

@@ -21,28 +21,32 @@ Requires DSH 0.2.2-rc.5 or a later 0.2.x.
 ### Install in DSH (recommended)
 
 1. Sidebar → **Plugins** → **Add plugin**.
-2. Paste this line and install:
+2. Paste the package name and install:
 
 ```sh
-github:Akira-yylm/dsh-session-calendar#v1.0.3
+@akira-yylm/session-calendar
 ```
 
 3. The bundle is enabled by default; restart DSH if the page says `restart-required`, then refresh. The **Session calendar** row appears under **Free session**.
 
+An npm install gains a **Versions** section in the plugin page, so upgrades are one **Update** click.
+
 ### From GitHub
 
-To let Plugin Manager treat the install as an **updatable** Git plugin, or to pin an exact commit, replace the tag with the full 40-char commit SHA:
+To bypass npm, or to pin an exact commit, install from the repository instead:
 
 ```sh
-github:Akira-yylm/dsh-session-calendar#<full 40-char commit SHA>
+github:Akira-yylm/dsh-session-calendar#v1.0.4
 ```
 
-A tag (such as `#v1.0.3`) or a branch name also installs, but is never treated as updatable. Find a release's full SHA with `git rev-parse v1.0.3`.
+To let Plugin Manager treat the install as an **updatable** Git plugin, replace the tag with the full 40-char commit SHA (`git rev-parse v1.0.4`); a tag or branch also installs, but never follows updates.
+
+> Git installs can be very slow from mainland China; prefer the npm method above.
 
 ### From the command line
 
 ```sh
-dsh plugin --profile <profile> add "github:Akira-yylm/dsh-session-calendar#v1.0.3"
+dsh plugin --profile <profile> add @akira-yylm/session-calendar
 ```
 
 ### From a local checkout
@@ -51,9 +55,8 @@ dsh plugin --profile <profile> add "github:Akira-yylm/dsh-session-calendar#v1.0.
 
 ## Upgrade
 
-Third-party Git plugins have no one-click updater: remove the old version, install the new commit.
-
-> Once published to npm, the plugin page gains a Versions section with an Update button.
+- **npm install**: click **Update** in the plugin page when a new version appears.
+- **GitHub install**: no one-click updater; remove the old version and install the new commit.
 
 ## Data and privacy
 
