@@ -38,11 +38,127 @@ window.__ModuleLoader__.load({
     /** Same-origin Host route that reports Session creation times. */
     const CREATED_PATH = '/dsh-session-calendar/created.json'
     /** Preferred card width in CSS pixels; narrow windows shrink it. */
-    const CARD_WIDTH = 320
+    const CARD_WIDTH = 360
     /** Grid rows are fixed at six weeks so the card height never jumps. */
     const GRID_WEEKS = 6
-    /** Card height kept clear below the trigger when the window allows it. */
-    const CARD_RESERVE = 360
+    /**
+     * The eight accent colours chosen for Workspaces, in family order:
+     * coral → orange → peach → cream → green → teal → blue.
+     */
+    const PALETTE = ['#FC757B', '#F97F5F', '#FAA26F', '#FDCD94', '#FEE199', '#B0D6A9', '#65BDBA', '#3C9BC9']
+
+    // ---------------------------------------------------------------------
+    // Workspace colours.
+    //
+    // A Workspace keeps one colour so the dots on the calendar and the rows of
+    // the day list agree. Which of the eight it gets depends on how many
+    // Workspaces exist, so that N Workspaces are spread as far apart as the
+    // family allows:
+    //
+    // - 8 divides N (1, 2, 4, 8): step through the eight, e.g. four
+    //   Workspaces take colours 1, 3, 5, 7.
+    // - otherwise the family is resampled at the smallest size that holds a
+    //   whole number of picks (three Workspaces need nine stops), and the picks
+    //   include both ends, e.g. 1, 5, 9 — the last one is the blue end.
+    // ---------------------------------------------------------------------
+
+    /** Parse `#RRGGBB` into `[r, g, b]`; invalid input falls back to black. */
+    function toRgb(hex) {
+      const value = String(hex).replace('#', '')
+      if (value.length !== 6) return [0, 0, 0]
+      const red = Number.parseInt(value.slice(0, 2), 16)
+      const green = Number.parseInt(value.slice(2, 4), 16)
+      const blue = Number.parseInt(value.slice(4, 6), 16)
+      if (!Number.isFinite(red) || !Number.isFinite(green) || !Number.isFinite(blue)) return [0, 0, 0]
+      return [red, green, blue]
+    }
+
+    /** Format `[r, g, b]` as `#RRGGBB`, matching the uppercase palette. */
+    function toHex(rgb) {
+      return '#' + rgb
+        .map((channel) => {
+          const clamped = Math.max(0, Math.min(255, Math.round(channel)))
+          return clamped.toString(16).padStart(2, '0').toUpperCase()
+        })
+        .join('')
+    }
+
+    /**
+     * Sample the family curve at `size` evenly spaced stops. The curve runs
+     * through {@link PALETTE}, so `size === PALETTE.length` returns the eight
+     * chosen colours unchanged and any other size is the same family resampled.
+     */
+    function familyStops(size) {
+      const last = PALETTE.length - 1
+      const stops = []
+      for (let index = 0; index < size; index += 1) {
+        const position = size <= 1 ? 0 : (index / (size - 1)) * last
+        const lower = Math.min(Math.floor(position), last - 1)
+        const fraction = position - lower
+        const from = toRgb(PALETTE[lower])
+        const to = toRgb(PALETTE[lower + 1])
+        stops.push(toHex([
+          from[0] + (to[0] - from[0]) * fraction,
+          from[1] + (to[1] - from[1]) * fraction,
+          from[2] + (to[2] - from[2]) * fraction,
+        ]))
+      }
+      return stops
+    }
+
+    /** The colours for `count` Workspaces, in Workspace order. */
+    function workspacePalette(count) {
+      if (count <= 0) return []
+      if (count <= PALETTE.length && PALETTE.length % count === 0) {
+        const step = PALETTE.length / count
+        const picked = []
+        for (let index = 0; index < count; index += 1) picked.push(PALETTE[index * step])
+        return picked
+      }
+      let size = PALETTE.length
+      while (size % count !== 0) size += 1
+      const stops = familyStops(size)
+      const picked = []
+      for (let index = 0; index < count; index += 1) {
+        const position = count === 1 ? 0 : (index * (size - 1)) / (count - 1)
+        picked.push(stops[Math.round(position)])
+      }
+      return picked
+    }
+
+    /** Memoised `workspacePalette`, because it runs on every render. */
+    const paletteCache = new Map()
+    function paletteFor(count) {
+      if (!paletteCache.has(count)) paletteCache.set(count, workspacePalette(count))
+      return paletteCache.get(count)
+    }
+
+    /**
+     * The paint for one day's frame: the single colour when only one Workspace
+     * created sessions that day, otherwise a gradient stopping at each of them.
+     */
+    function dayRing(colors) {
+      if (colors.length === 0) return undefined
+      if (colors.length === 1) return colors[0]
+      const stops = colors.map((color, index) => color + ' '
+        + Math.round((index * 100) / (colors.length - 1)) + '%')
+      return 'linear-gradient(135deg, ' + stops.join(', ') + ')'
+    }
+
+    /** Distinct Workspace colour indexes a day needs dots for, in one row. */
+    const MAX_DAY_DOTS = 8
+    function dayColorIndexes(groups) {
+      const indexes = []
+      for (const group of groups) {
+        if (!indexes.includes(group.colorIndex)) indexes.push(group.colorIndex)
+      }
+      indexes.sort((left, right) => {
+        if (left < 0) return 1
+        if (right < 0) return -1
+        return left - right
+      })
+      return indexes.slice(0, MAX_DAY_DOTS)
+    }
 
     // ---------------------------------------------------------------------
     // Copy. Chinese is also the runtime fallback when a seat omits `t`.
@@ -52,6 +168,9 @@ window.__ModuleLoader__.load({
       entry: '会话日历',
       panel: '会话日历',
       open: '打开会话日历',
+      'mode.first': '首次',
+      'mode.last': '最近',
+      'mode.switch': '按第一次对话时间 / 按最近一次对话时间',
       close: '关闭会话日历',
       today: '今天',
       prevMonth: '上个月',
@@ -92,6 +211,9 @@ window.__ModuleLoader__.load({
       entry: 'Session calendar',
       panel: 'Session calendar',
       open: 'Open the session calendar',
+      'mode.first': 'First',
+      'mode.last': 'Latest',
+      'mode.switch': 'Group by first prompt or by latest conversation',
       close: 'Close the session calendar',
       today: 'Today',
       prevMonth: 'Previous month',
@@ -146,6 +268,13 @@ window.__ModuleLoader__.load({
     // ---------------------------------------------------------------------
     // Shared open state between the sidebar row and the overlay entry.
     // ---------------------------------------------------------------------
+
+    /**
+     * Which end of a Session's span the sheet groups by. It outlives the sheet,
+     * so reopening it keeps the reader's last choice; the switch lives inside
+     * the card now, not on the sidebar row.
+     */
+    let lastMode = 'first'
 
     let shared = { open: false, anchor: null, trigger: null }
     const listeners = new Set()
@@ -335,12 +464,31 @@ window.__ModuleLoader__.load({
     /** Last accepted Host payload, so reopening paints instantly. */
     let payloadCache = null
 
-    /** One parsed creation-time row, or null when the row is unusable. */
+    /** One parsed time row, or null when the row is unusable. */
     function readRow(row) {
       if (row === null || typeof row !== 'object') return null
       if (typeof row.id !== 'string' || row.id === '') return null
-      if (typeof row.createdAt !== 'number' || !Number.isFinite(row.createdAt)) return null
+      if (!Number.isFinite(row.startedAt) && !Number.isFinite(row.createdAt)) return null
       return row
+    }
+
+    /**
+     * The time this Session lands on under `mode`:
+     * - `first`: when its conversation began;
+     * - `last`: when it was last talked to.
+     *
+     * DSH already tracks the last human prompt: `SessionSummary.updatedAt` is
+     * the newer of the Session's creation and that prompt's time, and only a
+     * `user/message` ever advances it — opening a Session, or a command the UI
+     * runs while opening it, does not. Everything falls back to the Session
+     * object's creation time.
+     */
+    function anchorOf(row, mode, info) {
+      if (mode === 'last') {
+        if (info !== undefined && info !== null && Number.isFinite(info.updatedAt)) return info.updatedAt
+        if (Number.isFinite(row.lastConversationAt)) return row.lastConversationAt
+      }
+      return Number.isFinite(row.startedAt) ? row.startedAt : row.createdAt
     }
 
     /** Fetch the Host's creation-time rows; refreshes on open and on retry. */
@@ -392,7 +540,7 @@ window.__ModuleLoader__.load({
      * Bucket creation rows into calendar days, each day grouped by Workspace in
      * the sidebar's own order. Returns `Map<'YYYY-MM-DD', { count, groups }>`.
      */
-    function indexDays(rows, sessionList, workspaceSnapshot, t) {
+    function indexDays(rows, sessionList, workspaceSnapshot, t, mode) {
       const sessions = (sessionList !== undefined && sessionList !== null && sessionList.byId) || {}
       const workspaces = (workspaceSnapshot !== undefined
         && workspaceSnapshot !== null
@@ -438,7 +586,13 @@ window.__ModuleLoader__.load({
         const groupOrder = workspace !== undefined
           ? (orderOf.get(workspace.workspaceId) === undefined ? 0 : orderOf.get(workspace.workspaceId))
           : workspaces.length + 1
-        const day = dayKeyOf(new Date(row.createdAt))
+        // The colour follows the Workspace's place in the registry, so it is
+        // the same on every day; a directory that is not a Workspace has none.
+        const colorIndex = workspace !== undefined
+          ? (orderOf.get(workspace.workspaceId) === undefined ? -1 : orderOf.get(workspace.workspaceId))
+          : -1
+        const when = anchorOf(row, mode, info)
+        const day = dayKeyOf(new Date(when))
         let bucket = days.get(day)
         if (bucket === undefined) {
           bucket = { count: 0, groups: new Map() }
@@ -446,7 +600,7 @@ window.__ModuleLoader__.load({
         }
         let group = bucket.groups.get(groupKey)
         if (group === undefined) {
-          group = { key: groupKey, title: groupTitle, order: groupOrder, items: [] }
+          group = { key: groupKey, title: groupTitle, order: groupOrder, colorIndex, items: [] }
           bucket.groups.set(groupKey, group)
         }
         const live = info !== undefined && info !== null && typeof info.title === 'string' ? info.title.trim() : ''
@@ -457,7 +611,7 @@ window.__ModuleLoader__.load({
         group.items.push({
           id: row.id,
           title: live !== '' ? live : stored !== '' ? stored : fallback !== '' ? fallback : t('untitled'),
-          time: row.createdAt,
+          time: when,
         })
         bucket.count += 1
       }
@@ -491,9 +645,11 @@ window.__ModuleLoader__.load({
         }
         const element = buttonRef.current
         const rect = element === null || element === undefined
-          ? { right: isWide ? 268 : 56, top: 120 }
+          ? { right: isWide ? 268 : 56 }
           : element.getBoundingClientRect()
-        openWith({ right: rect.right, top: rect.top }, element)
+        // Only the horizontal anchor is needed: the card centres itself
+        // vertically in the frame.
+        openWith({ right: rect.right }, element)
       }
 
       return h(
@@ -542,27 +698,43 @@ window.__ModuleLoader__.load({
       const cardRef = React.useRef(null)
       // Captured before the shared sheet clears its trigger on close.
       const triggerRef = React.useRef(shared.trigger)
-      const skipFocusReturn = React.useRef(false)
       const todayKey = dayKeyOf(new Date())
       const [month, setMonth] = React.useState(() => monthStartOf(new Date()))
       const [selected, setSelected] = React.useState(() => todayKey)
+      const [mode, setMode] = React.useState(lastMode)
+      const changeMode = (next) => {
+        lastMode = next
+        setMode(next)
+      }
 
       const days = React.useMemo(
-        () => indexDays(created.rows, sessionList, workspaceSnapshot, t),
-        [created.rows, sessionList, workspaceSnapshot, t],
+        () => indexDays(created.rows, sessionList, workspaceSnapshot, t, mode),
+        [created.rows, sessionList, workspaceSnapshot, t, mode],
       )
+      const workspaceCount = (workspaceSnapshot !== undefined
+        && workspaceSnapshot !== null
+        && Array.isArray(workspaceSnapshot.items))
+        ? workspaceSnapshot.items.length
+        : 0
+      const palette = React.useMemo(() => paletteFor(workspaceCount), [workspaceCount])
+      /** One Workspace's colour, or the quiet tertiary tone for an orphan group. */
+      const colorOf = (colorIndex) => (colorIndex >= 0 && palette[colorIndex] !== undefined
+        ? palette[colorIndex]
+        : 'var(--dsw-alias-label-tertiary)')
 
       const geometry = React.useMemo(() => {
         const viewportWidth = typeof window === 'undefined' ? 1440 : window.innerWidth
         const viewportHeight = typeof window === 'undefined' ? 900 : window.innerHeight
-        const width = Math.max(240, Math.min(CARD_WIDTH, viewportWidth - 24))
+        const width = Math.max(260, Math.min(CARD_WIDTH, viewportWidth - 24))
+        // Horizontally the card hugs the sidebar's right edge; vertically the
+        // stylesheet centres it in the frame with auto margins, so it never
+        // hands off the bottom of a short window.
         const wantedLeft = anchor === null || anchor === undefined ? 268 : anchor.right + 10
         const left = Math.max(12, Math.min(wantedLeft, viewportWidth - width - 12))
-        const wantedTop = anchor === null || anchor === undefined ? 96 : anchor.top
-        // Keep room for the whole card; on a short window the card scrolls instead.
-        const top = Math.max(12, Math.min(wantedTop, viewportHeight - CARD_RESERVE))
-        const maxHeight = Math.max(220, Math.min(560, viewportHeight - top - 24))
-        return { left, top, width, maxHeight }
+        // The height is fixed: switching to a day with more or fewer sessions
+        // must not resize the card, or the grid would slide under the pointer.
+        const height = Math.max(260, Math.min(720, viewportHeight - 24))
+        return { left, width, height }
       }, [anchor])
 
       React.useEffect(() => {
@@ -570,9 +742,8 @@ window.__ModuleLoader__.load({
         if (card !== null && card !== undefined && typeof card.focus === 'function') {
           card.focus({ preventScroll: true })
         }
-        // Closing returns focus to the row, unless the click opened a Session.
+        // Closing returns focus to the sidebar row.
         return () => {
-          if (skipFocusReturn.current) return
           const trigger = triggerRef.current
           if (trigger === null || trigger === undefined || trigger.isConnected !== true) return
           try {
@@ -630,9 +801,11 @@ window.__ModuleLoader__.load({
         setMonth(next)
         setSelected(firstDayWithSessions(next, days) || dayKeyOf(next))
       }
-      const openAndClose = (sessionId) => {
-        skipFocusReturn.current = true
-        closeShared()
+      // Opening a session leaves the calendar where it is: the window is a
+      // browsing surface, so the reader can keep picking sessions from it.
+      // Dismissing stays on the explicit paths (the row again, a click
+      // outside, Escape, or a window resize).
+      const openFromList = (sessionId) => {
         if (typeof openSession === 'function') openSession(sessionId)
       }
 
@@ -655,13 +828,13 @@ window.__ModuleLoader__.load({
           id: 'session-calendar-card',
           className: 'sc-card',
           role: 'dialog',
-          'aria-label': t('panel'),
+          'data-mode': mode,
+          'aria-label': t('panel') + ' · ' + t('mode.' + mode),
           tabIndex: -1,
           style: {
             left: geometry.left + 'px',
-            top: geometry.top + 'px',
             width: geometry.width + 'px',
-            maxHeight: geometry.maxHeight + 'px',
+            height: geometry.height + 'px',
           },
         },
         h(
@@ -689,6 +862,22 @@ window.__ModuleLoader__.load({
               onClick: () => { goMonth(1) },
             },
             h(ChevronGlyph, { direction: 'right' }),
+          ),
+          h(
+            'div',
+            { className: 'sc-mode', role: 'group', 'aria-label': t('mode.switch') },
+            ['first', 'last'].map((value) => h(
+              'button',
+              {
+                key: value,
+                type: 'button',
+                className: 'sc-modeBtn',
+                'aria-pressed': mode === value ? 'true' : 'false',
+                title: t('mode.switch'),
+                onClick: () => { changeMode(value) },
+              },
+              t('mode.' + value),
+            )),
           ),
           h(
             'button',
@@ -725,10 +914,14 @@ window.__ModuleLoader__.load({
             const key = dayKeyOf(date)
             const entry = days.get(key)
             const count = entry === undefined ? 0 : entry.count
+            const dotIndexes = entry === undefined ? [] : dayColorIndexes(entry.list)
+            const ring = dayRing(dotIndexes.map((index) => colorOf(index)))
             const classes = ['sc-cell']
             if (count > 0) classes.push('sc-cellFilled')
+            // Today and the picked day are independent marks, so a picked
+            // today keeps both.
+            if (key === todayKey) classes.push('sc-cellToday')
             if (key === selected) classes.push('sc-cellSelected')
-            else if (key === todayKey) classes.push('sc-cellToday')
             return h(
               'button',
               {
@@ -743,10 +936,26 @@ window.__ModuleLoader__.load({
                     count,
                   })
                   : undefined,
+                // The hover text names the Workspaces the coloured dots stand
+                // for, so the colour is readable before the day is opened.
+                title: entry === undefined
+                  ? undefined
+                  : entry.list.map((group) => group.title + ' · ' + group.items.length).join('\n'),
+                style: ring === undefined ? undefined : { '--sc-ring': ring },
                 onClick: () => { setSelected(key) },
               },
               h('span', { className: 'sc-dayNum' }, String(date.getDate())),
-              count > 0 ? h('span', { className: 'sc-dot' }) : null,
+              dotIndexes.length > 0
+                ? h(
+                  'span',
+                  { className: 'sc-dots' },
+                  dotIndexes.map((index) => h('span', {
+                    key: index,
+                    className: 'sc-dot',
+                    style: { '--sc-dot': colorOf(index) },
+                  })),
+                )
+                : null,
             )
           }),
         ),
@@ -779,14 +988,16 @@ window.__ModuleLoader__.load({
                     'section',
                     {
                       key: group.key === '' ? '__none__' : group.key,
-                      // Each Workspace keeps one accent hue, so a coloured
-                      // hairline also tells the groups apart at a glance.
-                      className: 'sc-group sc-accent-' + (((group.order % 4) + 4) % 4),
+                      // The Workspace's own colour drives the group glyph and
+                      // the hairline around each of its rows, so the day list
+                      // and the calendar dots speak one colour language.
+                      className: 'sc-group',
+                      style: { '--sc-accent': colorOf(group.colorIndex) },
                     },
                     h(
                       'div',
                       { className: 'sc-groupHead' },
-                      h(FolderGlyph, { size: 12 }),
+                      h(FolderGlyph, { size: 13 }),
                       h('span', { className: 'sc-groupTitle', title: group.title }, group.title),
                       h('span', { className: 'sc-groupCount' }, String(group.items.length)),
                     ),
@@ -797,7 +1008,7 @@ window.__ModuleLoader__.load({
                         type: 'button',
                         className: 'sc-row',
                         title: item.title,
-                        onClick: () => { openAndClose(item.id) },
+                        onClick: () => { openFromList(item.id) },
                       },
                       h('span', { className: 'sc-rowTitle' }, item.title),
                       h('span', { className: 'sc-rowTime' }, clockOf(item.time)),
@@ -822,7 +1033,9 @@ window.__ModuleLoader__.load({
          share one colour. */
       .sc-stack,
       .sc-card {
-        --sc-calendar-accent: var(--dsw-alias-state-business-primary);
+        /* The brand blue from DSH's own mark, at the owner's explicit request
+           for a brighter accent; it is one hue in both themes. */
+        --sc-calendar-accent: #4D6BFE;
       }
       .sc-stack {
         flex: 1 1 auto;
@@ -839,6 +1052,9 @@ window.__ModuleLoader__.load({
       /* Unlike the two filled conversation buttons above it, this row is a
          tool: outlined, unfilled, and accented with the calendar's own colour,
          so its different purpose reads before its label does. */
+      /* Closed, the entry keeps the hairline outline of a button but stays
+         unfilled; open, it takes a light wash of the brand blue, so the colour
+         means "this calendar is showing" rather than decorating the row. */
       .sc-launch {
         display: flex;
         align-items: center;
@@ -850,10 +1066,9 @@ window.__ModuleLoader__.load({
         margin: 0;
         box-sizing: border-box;
         border: 1px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
-        border-color: color-mix(in srgb, var(--sc-calendar-accent) 38%, transparent);
         border-radius: var(--dsw-radius-md, 10px);
         background: transparent;
-        color: var(--dsw-alias-label-secondary);
+        color: var(--dsw-alias-label-primary);
         font: inherit;
         font-size: 14px;
         font-weight: 500;
@@ -867,24 +1082,23 @@ window.__ModuleLoader__.load({
         color: var(--sc-calendar-accent);
       }
       .sc-launch[aria-expanded='true'] {
-        border-color: color-mix(in srgb, var(--sc-calendar-accent) 72%, transparent);
-        background: color-mix(in srgb, var(--sc-calendar-accent) 12%, transparent);
-        color: var(--dsw-alias-label-primary);
+        border-color: color-mix(in srgb, var(--sc-calendar-accent) 45%, transparent);
+        background: color-mix(in srgb, var(--sc-calendar-accent) 15%, transparent);
       }
       .sc-launch:focus-visible {
         outline: 2px solid var(--dsw-focus-ring-color, var(--sc-calendar-accent));
         outline-offset: 1px;
       }
+      @media (hover: hover) {
+        .sc-launch:not([aria-expanded='true']):hover,
+        .sc-launchRail:not([aria-expanded='true']):hover {
+          background: var(--dsw-alias-interactive-bg-hover);
+        }
+      }
       .sc-launchRail {
         width: 36px;
         height: 36px;
         padding: 0;
-        border-color: color-mix(in srgb, var(--sc-calendar-accent) 28%, transparent);
-        background: transparent;
-      }
-      .sc-launchRail[aria-expanded='true'] {
-        border-color: color-mix(in srgb, var(--sc-calendar-accent) 72%, transparent);
-        background: color-mix(in srgb, var(--sc-calendar-accent) 12%, transparent);
       }
       .sc-launchLabel {
         overflow: hidden;
@@ -904,6 +1118,14 @@ window.__ModuleLoader__.load({
 
       .sc-card {
         position: fixed;
+        /* Vertical centring without a transform: auto margins split the free
+           space, which keeps the backdrop blur sampling correctly. */
+        top: 0;
+        bottom: 0;
+        height: min(720px, calc(100vh - 24px));
+        max-height: calc(100vh - 24px);
+        margin-top: auto;
+        margin-bottom: auto;
         z-index: 1;
         display: flex;
         flex-direction: column;
@@ -929,7 +1151,7 @@ window.__ModuleLoader__.load({
         display: flex;
         align-items: center;
         gap: 2px;
-        padding: 8px 8px 2px;
+        padding: 10px 10px 4px;
       }
       .sc-monthLabel {
         flex: 1 1 auto;
@@ -938,7 +1160,7 @@ window.__ModuleLoader__.load({
         text-overflow: ellipsis;
         white-space: nowrap;
         text-align: center;
-        font-size: 13px;
+        font-size: 14px;
         line-height: 1.6;
         color: var(--dsw-alias-label-primary);
       }
@@ -947,11 +1169,11 @@ window.__ModuleLoader__.load({
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 26px;
-        height: 26px;
+        width: 28px;
+        height: 28px;
         padding: 0;
         border: 0;
-        border-radius: 8px;
+        border-radius: 9px;
         background: transparent;
         color: var(--dsw-alias-label-secondary);
         cursor: pointer;
@@ -983,12 +1205,45 @@ window.__ModuleLoader__.load({
           background: var(--dsw-alias-interactive-bg-hover);
         }
       }
+      /* The grouping switch inside the card: two small segments. */
+      .sc-mode {
+        flex: none;
+        display: flex;
+        align-items: center;
+        height: 24px;
+        padding: 1px;
+        box-sizing: border-box;
+        border: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+        border-radius: 7px;
+        background: color-mix(in srgb, var(--dsw-alias-label-primary) 5%, transparent);
+      }
+      .sc-modeBtn {
+        height: 20px;
+        padding: 0 7px;
+        border: 0;
+        border-radius: 5px;
+        background: transparent;
+        color: var(--dsw-alias-label-secondary);
+        font: inherit;
+        font-size: 11.5px;
+        line-height: 20px;
+        cursor: pointer;
+      }
+      .sc-modeBtn[aria-pressed='true'] {
+        background: color-mix(in srgb, var(--sc-calendar-accent) 16%, transparent);
+        color: var(--dsw-alias-label-primary);
+        font-weight: 600;
+      }
+      .sc-modeBtn:focus-visible {
+        outline: 2px solid var(--dsw-focus-ring-color, var(--sc-calendar-accent));
+        outline-offset: -1px;
+      }
       .sc-today {
         flex: none;
-        height: 26px;
+        height: 28px;
         padding: 0 8px;
         border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
-        border-radius: 8px;
+        border-radius: 9px;
         background: transparent;
         color: var(--dsw-alias-label-secondary);
         font: inherit;
@@ -1004,41 +1259,41 @@ window.__ModuleLoader__.load({
         display: grid;
         grid-template-columns: repeat(7, 1fr);
         gap: 2px;
-        margin-top: 2px;
-        padding: 0 8px;
+        margin-top: 4px;
+        padding: 0 10px;
       }
       .sc-weekday {
         display: flex;
         align-items: center;
         justify-content: center;
-        height: 22px;
+        height: 24px;
         color: var(--dsw-alias-label-tertiary);
-        font-size: 11px;
+        font-size: 12px;
         line-height: 1.6;
       }
       .sc-grid {
         flex: none;
         display: grid;
         grid-template-columns: repeat(7, 1fr);
-        gap: 2px;
-        padding: 0 8px 6px;
+        gap: 3px;
+        padding: 0 10px 8px;
       }
       .sc-cell {
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 1px;
-        height: 30px;
+        gap: 2px;
+        height: 38px;
         padding: 0;
         box-sizing: border-box;
-        border: 1px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
+        border: 1.5px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
         border-color: color-mix(in srgb, var(--dsw-alias-label-secondary) 15%, transparent);
-        border-radius: 8px;
+        border-radius: 10px;
         background: transparent;
         color: var(--dsw-alias-label-primary);
         font: inherit;
-        font-size: 13px;
+        font-size: 14px;
         font-variant-numeric: tabular-nums;
         line-height: 1.6;
         cursor: pointer;
@@ -1048,35 +1303,68 @@ window.__ModuleLoader__.load({
         cursor: default;
         visibility: hidden;
       }
-      /* Every date keeps a neutral 1px frame; a day with sessions swaps it for
-         the calendar's accent colour, today strengthens it, and the picked day
-         takes the solid accent plus a tinted fill. */
-      .sc-cellFilled {
-        border-color: color-mix(in srgb, var(--sc-calendar-accent) 34%, transparent);
+      /* A day with sessions paints its frame in the Workspace colours: one
+         solid colour, or a gradient through every Workspace that created
+         sessions that day. The frame is a masked ring so the rounded corners
+         survive, and the cell's own border steps aside for it. */
+      .sc-cell {
+        position: relative;
       }
-      .sc-cellToday {
+      .sc-cellFilled {
+        border-color: transparent;
+      }
+      .sc-cellFilled::before {
+        content: '';
+        position: absolute;
+        inset: -1.5px;
+        border-radius: inherit;
+        padding: 1.5px;
+        background: var(--sc-ring, var(--dsw-alias-border-l3));
+        -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+        mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        mask-composite: exclude;
+        pointer-events: none;
+      }
+      .sc-cellToday:not(.sc-cellFilled) {
         border-color: color-mix(in srgb, var(--sc-calendar-accent) 62%, transparent);
       }
-      .sc-cellSelected,
-      .sc-cellSelected:hover {
-        border-color: var(--sc-calendar-accent);
+      .sc-cellToday .sc-dayNum {
+        color: var(--sc-calendar-accent);
+        font-weight: 600;
+      }
+      .sc-cellSelected {
         background: color-mix(in srgb, var(--sc-calendar-accent) 16%, transparent);
         color: var(--dsw-alias-label-primary);
         font-weight: 600;
       }
+      .sc-cellSelected:not(.sc-cellFilled) {
+        border-color: var(--sc-calendar-accent);
+      }
       .sc-dayNum {
-        line-height: 15px;
+        line-height: 18px;
+      }
+      /* One dot per Workspace present that day; a row holds five, then wraps. */
+      .sc-dots {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        max-width: 38px;
+        max-height: 13px;
+        overflow: hidden;
       }
       .sc-dot {
-        width: 4px;
-        height: 4px;
+        width: 5px;
+        height: 5px;
         border-radius: 50%;
-        background: var(--sc-calendar-accent);
+        background: var(--sc-dot, var(--dsw-alias-label-tertiary));
       }
       .sc-divider {
         flex: none;
         height: 1px;
-        margin: 0 8px;
+        margin: 0 10px;
         background: var(--dsw-alias-border-l1, rgba(0, 0, 0, 0.06));
       }
       .sc-dayHead {
@@ -1085,10 +1373,10 @@ window.__ModuleLoader__.load({
         align-items: baseline;
         justify-content: space-between;
         gap: 8px;
-        padding: 8px 12px 2px;
+        padding: 9px 14px 3px;
       }
       .sc-dayLabel {
-        font-size: 12px;
+        font-size: 12.5px;
         font-weight: 600;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1096,16 +1384,19 @@ window.__ModuleLoader__.load({
       }
       .sc-dayCount {
         flex: none;
-        font-size: 11px;
+        font-size: 11.5px;
         color: var(--dsw-alias-label-secondary);
       }
       .sc-list {
         flex: 1 1 auto;
         min-height: 0;
+        display: flex;
+        flex-direction: column;
         overflow-y: auto;
-        padding: 2px 6px 8px;
+        padding: 3px 8px 10px;
       }
       .sc-group {
+        flex: none;
         display: flex;
         flex-direction: column;
         gap: 3px;
@@ -1113,31 +1404,25 @@ window.__ModuleLoader__.load({
       .sc-group + .sc-group {
         margin-top: 8px;
       }
-      /* One accent hue per Workspace: it colours the group's glyph and the
-         hairline around each of its session rows. */
-      .sc-accent-0 {
-        --sc-accent: var(--dsw-alias-state-business-primary);
-      }
-      .sc-accent-1 {
-        --sc-accent: var(--dsw-alias-state-success-primary);
-      }
-      .sc-accent-2 {
-        --sc-accent: var(--dsw-alias-state-warn-primary);
-      }
-      .sc-accent-3 {
-        --sc-accent: var(--dsw-alias-state-error-primary);
-      }
+      /* --sc-accent arrives inline from the Workspace palette: one colour per
+         Workspace, used by the group glyph and its rows' hairlines. */
+      /* The Workspace heading stays pinned while its own rows scroll past, so
+         a busy day never loses track of which group you are reading. */
       .sc-groupHead {
+        position: sticky;
+        top: 0;
+        z-index: 1;
         display: flex;
         align-items: center;
         gap: 5px;
-        padding: 6px 6px 2px;
+        padding: 7px 7px 3px;
         color: var(--dsw-alias-label-secondary);
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 600;
+        background: var(--dsw-specific-menu, var(--dsw-alias-bg-layer-1));
       }
       .sc-groupHead svg {
-        color: color-mix(in srgb, var(--sc-accent, currentColor) 78%, var(--dsw-alias-label-secondary));
+        color: var(--sc-accent, currentColor);
       }
       .sc-groupTitle {
         overflow: hidden;
@@ -1152,17 +1437,17 @@ window.__ModuleLoader__.load({
       .sc-row {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 9px;
         width: 100%;
-        padding: 5px 7px;
+        padding: 4px 8px;
         box-sizing: border-box;
         border: 1px solid var(--dsw-alias-border-l3, rgba(0, 0, 0, 0.12));
-        border-color: color-mix(in srgb, var(--sc-accent, currentColor) 30%, transparent);
-        border-radius: 8px;
-        background: color-mix(in srgb, var(--sc-accent, currentColor) 4%, transparent);
+        border-color: color-mix(in srgb, var(--sc-accent, currentColor) 42%, transparent);
+        border-radius: 9px;
+        background: color-mix(in srgb, var(--sc-accent, currentColor) 5%, transparent);
         color: var(--dsw-alias-label-primary);
         font: inherit;
-        font-size: 13px;
+        font-size: 13.5px;
         text-align: left;
         cursor: pointer;
       }
@@ -1181,10 +1466,13 @@ window.__ModuleLoader__.load({
       }
       .sc-note {
         flex: none;
-        padding: 16px 14px 18px;
+        /* Auto vertical margins centre the note in whatever space is left, so
+           a fixed-height card never leaves it stranded at the top. */
+        margin: auto 0;
+        padding: 18px 16px 20px;
         text-align: center;
         color: var(--dsw-alias-label-secondary);
-        font-size: 12px;
+        font-size: 12.5px;
       }
       .sc-note strong {
         display: block;
@@ -1194,7 +1482,7 @@ window.__ModuleLoader__.load({
       }
       .sc-retry {
         margin-top: 10px;
-        height: 26px;
+        height: 28px;
         padding: 0 12px;
         border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
         border-radius: 8px;
@@ -1207,7 +1495,14 @@ window.__ModuleLoader__.load({
 
       /* A window too short for the grid plus a list scrolls the whole card
          instead of squeezing the list out of existence. */
-      @media (max-height: 460px) {
+      @media (max-height: 560px) {
+        .sc-cell {
+          height: 32px;
+        }
+      }
+      /* Below this the fixed layout cannot fit at all, so the card itself
+         becomes the scroller instead of clipping the grid. */
+      @media (max-height: 420px) {
         .sc-card {
           overflow-y: auto;
         }
@@ -1215,8 +1510,8 @@ window.__ModuleLoader__.load({
           flex: 0 0 auto;
           overflow: visible;
         }
-        .sc-cell {
-          height: 26px;
+        .sc-note {
+          margin: 0;
         }
       }
     `
@@ -1239,9 +1534,12 @@ window.__ModuleLoader__.load({
         return () => { element.remove() }
       }, 'session-calendar: styles')
 
-      /** Open one Session and dismiss the card in the same navigation. */
+      /**
+       * Open one Session without dismissing the card: the calendar stays up so
+       * the reader can keep picking from the same day. Dismissing remains the
+       * explicit paths (the row, a click outside, Escape, a resize).
+       */
       const openSession = (sessionId) => {
-        closeShared()
         try {
           ctx.uiWorkspace.openSession(sessionId)
         } catch (error) {

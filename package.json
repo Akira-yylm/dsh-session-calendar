@@ -1,6 +1,6 @@
 {
   "name": "@akira-yylm/session-calendar",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "type": "module",
   "description": "Session calendar: a month calendar beside the sidebar listing every session created on the selected day, grouped by workspace.",
   "license": "MIT",
