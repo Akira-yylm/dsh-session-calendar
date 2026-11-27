@@ -18,18 +18,31 @@ Adds a **Session calendar** row just below the **Free session** row in the left 
 
 Requires DSH 0.2.2-rc.5 or a later 0.2.x.
 
-### From GitHub (recommended)
+### Install in DSH (recommended)
 
 1. Sidebar → **Plugins** → **Add plugin**.
-2. Paste `github:Akira-yylm/dsh-session-calendar#<full 40-char commit SHA>` and install.
-3. The bundle is enabled by default; restart DSH if the page says `restart-required`, then refresh.
+2. Paste this line and install:
 
-A full commit is what lets Plugin Manager treat the bundle as an updatable Git install. A tag such as `#v1.0.2` or a branch name also installs, but is never treated as updatable. Find the full SHA of a release with `git rev-parse v1.0.2`.
+```sh
+github:Akira-yylm/dsh-session-calendar#v1.0.3
+```
+
+3. The bundle is enabled by default; restart DSH if the page says `restart-required`, then refresh. The **Session calendar** row appears under **Free session**.
+
+### From GitHub
+
+To let Plugin Manager treat the install as an **updatable** Git plugin, or to pin an exact commit, replace the tag with the full 40-char commit SHA:
+
+```sh
+github:Akira-yylm/dsh-session-calendar#<full 40-char commit SHA>
+```
+
+A tag (such as `#v1.0.3`) or a branch name also installs, but is never treated as updatable. Find a release's full SHA with `git rev-parse v1.0.3`.
 
 ### From the command line
 
 ```sh
-dsh plugin --profile <profile> add "github:Akira-yylm/dsh-session-calendar#v1.0.2"
+dsh plugin --profile <profile> add "github:Akira-yylm/dsh-session-calendar#v1.0.3"
 ```
 
 ### From a local checkout

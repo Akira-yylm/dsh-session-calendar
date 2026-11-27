@@ -18,18 +18,31 @@
 
 需要在 DSH 0.2.2-rc.5 或更高的 0.2.x 上使用。
 
-### 从 GitHub 安装（推荐）
+### 在 DSH 中安装（推荐）
 
 1. 打开 DSH 侧栏 **插件** → **添加插件**。
-2. 粘贴 `github:Akira-yylm/dsh-session-calendar#<40 位完整 commit SHA>`，点安装。
-3. 装好后插件默认启用；页面提示 `restart-required` 时重启 DSH，再刷新页面。
+2. 把下面这一行粘进输入框，点安装：
 
-固定完整 commit 才能被 Plugin Manager 识别为「可更新」的 Git 插件；写 tag（如 `#v1.0.2`）或分支名也能装，但不会被识别为可更新。某个版本对应的完整 SHA 可以用 `git rev-parse v1.0.2` 查到。
+```sh
+github:Akira-yylm/dsh-session-calendar#v1.0.3
+```
+
+3. 装好后插件默认启用；页面提示 `restart-required` 时重启 DSH，再刷新页面。左侧「免费会话」下方就会出现「会话日历」。
+
+### 从 GitHub 安装
+
+想让 Plugin Manager 把插件识别为**可更新**的 Git 安装（版本列表里能直接更新），或者想把版本锁死在某个提交上，就把 tag 换成完整的 40 位 commit SHA：
+
+```sh
+github:Akira-yylm/dsh-session-calendar#<40 位完整 commit SHA>
+```
+
+写 tag（如 `#v1.0.3`）或分支名也能装，但不会被识别为可更新。某个版本对应的完整 SHA 可以用 `git rev-parse v1.0.3` 查到。
 
 ### 用命令安装
 
 ```sh
-dsh plugin --profile <profile> add "github:Akira-yylm/dsh-session-calendar#v1.0.2"
+dsh plugin --profile <profile> add "github:Akira-yylm/dsh-session-calendar#v1.0.3"
 ```
 
 ### 从本地目录安装
