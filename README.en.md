@@ -16,10 +16,10 @@ Clicking a row opens that session, and the switch remembers your last choice.
 ## Usage
 
 1. Under **New session** / **Free session** sits **one `Session calendar` button** — transparent with a neutral hairline while closed, a 15% brand-blue wash plus a 45% hairline while open, spanning the row width; it becomes a 36px icon button in the collapsed rail.
-2. Clicking it opens the calendar to the right of the sidebar, **vertically centred** in the window (about 360px wide, 38px day cells). Its height is fixed (up to 720px), so switching days scrolls only the list and never shifts the grid under your pointer; on a busy day the list scrolls with each group heading pinned.
-3. **Switching rules**: in the card header, right of the month navigation, a small **First / Latest** segmented switch re-groups in place; the choice is remembered, and pressing the sidebar button again dismisses the card.
+2. Clicking it opens the calendar to the right of the sidebar, **vertically centred** in the window (about 360px wide, 38px day cells). Its first row is the month title; the second row is four evenly split buttons — `‹` `›` `Today` `×`. Its height is fixed (up to 720px), so switching days scrolls only the list and never shifts the grid under your pointer; on a busy day the list scrolls with each group heading pinned.
+3. **Switching rules**: under the month title sits a full-width **First / Latest** segmented switch (about 160px per segment); it re-groups in place, the choice is remembered, and pressing the sidebar button again dismisses the card.
 4. A day with sessions is framed in **the colours of the workspaces involved under the active rule** (solid for one, a gradient for several), with one dot per workspace below; hovering names them and their counts.
-5. `‹` / `›` page months (landing on that month's earliest day with sessions); **Today** returns.
+5. `‹` / `›` page months (landing on that month's earliest day with sessions); **Today** returns. With focus inside the card the **arrow keys** work as well: `←` `→` for a day, `↑` `↓` for a week, following the month when needed.
 6. Sessions are grouped in sidebar workspace order; the group glyph and every row's hairline use that workspace's colour, and each row shows title plus the time the active rule uses. The list header names the rule (by first prompt / by latest).
 7. Click a row to open that session in the conversation area; **the calendar stays open**, so you can keep picking from the same day.
 8. Dismiss with the active button again, a click outside, `Esc`, or a window resize.
@@ -29,8 +29,8 @@ Clicking a row opens that session, and the switch remembers your last choice.
 The calendar dots, each day's frame, the group glyph, and each session row's hairline share **one colour per workspace**, so the month grid itself says which workspace created sessions on which day.
 
 - One workspace that day: the frame is that solid colour.
-- Several workspaces: the frame is a 135° gradient through their colours in workspace order.
-- **Today** is marked by an accent-coloured date number and **the picked day** by a tinted fill plus bolder type; neither overrides the data colour.
+- Several workspaces: the frame is an angular gradient centred on the cell, one wedge per workspace in workspace order.
+- **Today** is marked by a bolder date number in the primary text colour plus an accent underline (the blue number was hard to read on the card), and **the picked day** by a 50% wash of that day's own colour scheme (solid for one workspace, an angular run centred on the cell, one wedge per workspace, for several) plus bolder type; neither overrides the data colour.
 
 Eight base colours, in family order:
 
@@ -67,10 +67,10 @@ An npm install gains a **Versions** section in the plugin page, so upgrades are 
 To bypass npm, or to pin an exact commit, install from the repository instead:
 
 ```sh
-github:Akira-yylm/dsh-session-calendar#v1.1.0
+github:Akira-yylm/dsh-session-calendar#v1.1.1
 ```
 
-To let Plugin Manager treat the install as an **updatable** Git plugin, replace the tag with the full 40-char commit SHA (`git rev-parse v1.1.0`); a tag or branch also installs, but never follows updates.
+To let Plugin Manager treat the install as an **updatable** Git plugin, replace the tag with the full 40-char commit SHA (`git rev-parse v1.1.1`); a tag or branch also installs, but never follows updates.
 
 > Git installs can be very slow from mainland China; prefer the npm method above.
 

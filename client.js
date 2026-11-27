@@ -137,12 +137,31 @@ window.__ModuleLoader__.load({
      * The paint for one day's frame: the single colour when only one Workspace
      * created sessions that day, otherwise a gradient stopping at each of them.
      */
+    /**
+     * The picked day is filled with the same colours its frame uses — a solid
+     * wash for one Workspace, an angular run around the cell's centre through
+     * all of them when the day touches several — at this alpha.
+     */
+    function dayFill(colors) {
+      if (colors.length === 0) return undefined
+      const wash = (color) => 'color-mix(in srgb, ' + color + ' 50%, transparent)'
+      if (colors.length === 1) return wash(colors[0])
+      const step = 360 / colors.length
+      const stops = colors.map((color, index) => wash(color) + ' ' + Math.round(index * step) + 'deg')
+      stops.push(wash(colors[0]) + ' 360deg')
+      return 'conic-gradient(from 0deg at 50% 50%, ' + stops.join(', ') + ')'
+    }
+
     function dayRing(colors) {
       if (colors.length === 0) return undefined
       if (colors.length === 1) return colors[0]
-      const stops = colors.map((color, index) => color + ' '
-        + Math.round((index * 100) / (colors.length - 1)) + '%')
-      return 'linear-gradient(135deg, ' + stops.join(', ') + ')'
+      // A thin frame sits at one radius, so a radial run would show a single
+      // colour there. Centring an angular gradient on the same point gives each
+      // Workspace its own wedge around the cell instead.
+      const step = 360 / colors.length
+      const stops = colors.map((color, index) => color + ' ' + Math.round(index * step) + 'deg')
+      stops.push(colors[0] + ' 360deg')
+      return 'conic-gradient(from 0deg at 50% 50%, ' + stops.join(', ') + ')'
     }
 
     /** Distinct Workspace colour indexes a day needs dots for, in one row. */
@@ -275,6 +294,7 @@ window.__ModuleLoader__.load({
      * the card now, not on the sidebar row.
      */
     let lastMode = 'first'
+
 
     let shared = { open: false, anchor: null, trigger: null }
     const listeners = new Set()
@@ -754,6 +774,43 @@ window.__ModuleLoader__.load({
         }
       }, [])
 
+      /**
+       * Header hover, driven by the pointer's own position.
+       *
+       * A quick pass over these controls could end with a `:hover`
+       * recalculation one frame behind, so the highlight never showed. Asking
+       * the document what is really under the pointer on every move is
+       * idempotent: whichever control the pointer is over carries the class,
+       * and a missed enter/leave cannot leave it stuck.
+       */
+      React.useEffect(() => {
+        const card = cardRef.current
+        if (card === null || card === undefined) return
+        const selector = '.sc-navBtn, .sc-today, .sc-seg'
+        let current = null
+        const clear = () => {
+          if (current === null) return
+          current.classList.remove('sc-hot')
+          current = null
+        }
+        const onMove = (event) => {
+          const top = document.elementFromPoint(event.clientX, event.clientY)
+          const hit = top !== null && typeof top.closest === 'function' ? top.closest(selector) : null
+          const next = hit !== null && card.contains(hit) ? hit : null
+          if (next === current) return
+          clear()
+          if (next !== null) {
+            next.classList.add('sc-hot')
+            current = next
+          }
+        }
+        document.addEventListener('pointermove', onMove, true)
+        return () => {
+          document.removeEventListener('pointermove', onMove, true)
+          clear()
+        }
+      }, [])
+
       React.useEffect(() => {
         const onPointerDown = (event) => {
           const card = cardRef.current
@@ -783,6 +840,39 @@ window.__ModuleLoader__.load({
           window.removeEventListener('resize', onResize)
         }
       }, [])
+
+      /**
+       * Arrow keys walk the selection: left/right by a day, up/down by a week.
+       * When the new date falls outside the shown month the month follows, so
+       * the keyboard never gets stuck at a month boundary. Keys are only taken
+       * while focus sits inside the card, so the conversation's own editor keeps
+       * its arrow keys.
+       */
+      React.useEffect(() => {
+        const onArrow = (event) => {
+          if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return
+          const card = cardRef.current
+          if (card === null || card === undefined) return
+          const active = document.activeElement
+          const inCard = active !== null && (active === card || card.contains(active))
+          if (!inCard) return
+          if (active instanceof HTMLElement
+            && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) return
+          const step = event.key === 'ArrowLeft' ? -1
+            : event.key === 'ArrowRight' ? 1
+              : event.key === 'ArrowUp' ? -7
+                : event.key === 'ArrowDown' ? 7
+                  : 0
+          if (step === 0) return
+          event.preventDefault()
+          const parts = selected.split('-')
+          const next = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]) + step)
+          setSelected(dayKeyOf(next))
+          if (!sameMonth(month, next)) setMonth(monthStartOf(next))
+        }
+        document.addEventListener('keydown', onArrow)
+        return () => { document.removeEventListener('keydown', onArrow) }
+      }, [selected, month])
 
       const cells = React.useMemo(() => buildGrid(month), [month])
       const bucket = days.get(selected)
@@ -837,6 +927,7 @@ window.__ModuleLoader__.load({
             height: geometry.height + 'px',
           },
         },
+        h('div', { className: 'sc-title' }, monthLabel),
         h(
           'header',
           { className: 'sc-head' },
@@ -851,7 +942,6 @@ window.__ModuleLoader__.load({
             },
             h(ChevronGlyph, { direction: 'left' }),
           ),
-          h('span', { className: 'sc-monthLabel' }, monthLabel),
           h(
             'button',
             {
@@ -864,27 +954,10 @@ window.__ModuleLoader__.load({
             h(ChevronGlyph, { direction: 'right' }),
           ),
           h(
-            'div',
-            { className: 'sc-mode', role: 'group', 'aria-label': t('mode.switch') },
-            ['first', 'last'].map((value) => h(
-              'button',
-              {
-                key: value,
-                type: 'button',
-                className: 'sc-modeBtn',
-                'aria-pressed': mode === value ? 'true' : 'false',
-                title: t('mode.switch'),
-                onClick: () => { changeMode(value) },
-              },
-              t('mode.' + value),
-            )),
-          ),
-          h(
             'button',
             {
               type: 'button',
               className: 'sc-today',
-              disabled: sameMonth(month, new Date()) && selected === todayKey,
               onClick: goToday,
             },
             t('today'),
@@ -903,6 +976,21 @@ window.__ModuleLoader__.load({
         ),
         h(
           'div',
+          { className: 'sc-modes', role: 'group', 'aria-label': t('mode.switch') },
+          ['first', 'last'].map((value) => h(
+            'button',
+            {
+              key: value,
+              type: 'button',
+              className: 'sc-seg',
+              'aria-pressed': mode === value ? 'true' : 'false',
+              onClick: () => { changeMode(value) },
+            },
+            t('mode.' + value),
+          )),
+        ),
+        h(
+          'div',
           { className: 'sc-weekRow' },
           [0, 1, 2, 3, 4, 5, 6].map((index) => h('span', { key: index, className: 'sc-weekday' }, t('weekday.' + index))),
         ),
@@ -915,7 +1003,12 @@ window.__ModuleLoader__.load({
             const entry = days.get(key)
             const count = entry === undefined ? 0 : entry.count
             const dotIndexes = entry === undefined ? [] : dayColorIndexes(entry.list)
-            const ring = dayRing(dotIndexes.map((index) => colorOf(index)))
+            const dayColors = dotIndexes.map((index) => colorOf(index))
+            const ring = dayRing(dayColors)
+            const fill = key === selected ? dayFill(dayColors) : undefined
+            const style = {}
+            if (ring !== undefined) style['--sc-ring'] = ring
+            if (fill !== undefined) style.background = fill
             const classes = ['sc-cell']
             if (count > 0) classes.push('sc-cellFilled')
             // Today and the picked day are independent marks, so a picked
@@ -941,7 +1034,7 @@ window.__ModuleLoader__.load({
                 title: entry === undefined
                   ? undefined
                   : entry.list.map((group) => group.title + ' · ' + group.items.length).join('\n'),
-                style: ring === undefined ? undefined : { '--sc-ring': ring },
+                style: Object.keys(style).length === 0 ? undefined : style,
                 onClick: () => { setSelected(key) },
               },
               h('span', { className: 'sc-dayNum' }, String(date.getDate())),
@@ -1134,8 +1227,12 @@ window.__ModuleLoader__.load({
         box-sizing: border-box;
         border: 0;
         border-radius: 16px;
+        /* No backdrop-filter here: it promotes the card to its own composited
+           layer, and a quick hover's background change can then miss the frame
+           that paints before the pointer leaves — the control looks inert when
+           the pointer moves fast. The menu token is already 94% opaque, so the
+           blur bought nothing visible. */
         background: var(--dsw-specific-menu, var(--dsw-alias-bg-overlay, var(--dsw-alias-bg-layer-1)));
-        backdrop-filter: var(--dsw-menu-backdrop-filter, none);
         --dsw-elevation-stroke-color: var(--dsw-alias-border-l1);
         box-shadow: var(--dsw-elevation-prominent);
         --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
@@ -1146,34 +1243,46 @@ window.__ModuleLoader__.load({
         overflow: hidden;
         outline: none;
       }
-      .sc-head {
+      /* The month is a heading; the four controls below split the row evenly,
+         so there is no dead stretch between them to miss. */
+      .sc-title {
         flex: none;
-        display: flex;
-        align-items: center;
-        gap: 2px;
-        padding: 10px 10px 4px;
-      }
-      .sc-monthLabel {
-        flex: 1 1 auto;
-        min-width: 0;
+        padding: 8px 10px 2px;
+        text-align: center;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.5;
+        color: var(--dsw-alias-label-primary);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        text-align: center;
-        font-size: 14px;
-        line-height: 1.6;
-        color: var(--dsw-alias-label-primary);
+      }
+      /* The month row is dressed exactly like the rule switch below it: one
+         outlined track holding two-pixel-apart segments. */
+      .sc-head {
+        flex: none;
+        display: flex;
+        align-items: stretch;
+        gap: 2px;
+        margin: 0 10px 4px;
+        padding: 2px;
+        min-height: 30px;
+        box-sizing: border-box;
+        border: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--dsw-alias-label-primary) 5%, transparent);
+        user-select: none;
       }
       .sc-navBtn {
-        flex: none;
+        flex: 1 1 0;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 28px;
-        height: 28px;
+        height: auto;
+        min-height: 26px;
         padding: 0;
         border: 0;
-        border-radius: 9px;
+        border-radius: 6px;
         background: transparent;
         color: var(--dsw-alias-label-secondary);
         cursor: pointer;
@@ -1187,13 +1296,19 @@ window.__ModuleLoader__.load({
         outline-offset: -2px;
       }
       @media (hover: hover) {
-        .sc-navBtn:hover {
+        .sc-navBtn:hover,
+        .sc-today:hover {
+          background: color-mix(in srgb, var(--dsw-alias-label-primary) 9%, transparent);
+          color: var(--dsw-alias-label-primary);
+        }
+        /* Both segments react to the pointer: the resting one lifts, the
+           pressed one deepens, so a click never reads as "nothing happened". */
+        .sc-seg:not([aria-pressed='true']):hover {
           background: var(--dsw-alias-interactive-bg-hover);
           color: var(--dsw-alias-label-primary);
         }
-        .sc-today:hover:not(:disabled) {
-          background: var(--dsw-alias-interactive-bg-hover);
-          color: var(--dsw-alias-label-primary);
+        .sc-seg[aria-pressed='true']:hover {
+          background: color-mix(in srgb, var(--sc-calendar-accent) 22%, transparent);
         }
         .sc-cell:hover {
           background: color-mix(in srgb, var(--sc-calendar-accent) 10%, transparent);
@@ -1205,54 +1320,86 @@ window.__ModuleLoader__.load({
           background: var(--dsw-alias-interactive-bg-hover);
         }
       }
-      /* The grouping switch inside the card: two small segments. */
-      .sc-mode {
+      /* Pointer-driven twins of the header hover rules: a class change is a
+         guaranteed repaint, so the controls answer on every entry. */
+      .sc-navBtn.sc-hot {
+        background: var(--dsw-alias-interactive-bg-hover);
+        color: var(--dsw-alias-label-primary);
+      }
+      .sc-today.sc-hot {
+        background: var(--dsw-alias-interactive-bg-hover);
+        color: var(--dsw-alias-label-primary);
+      }
+      /* The grouping switch gets its own full-width row: two big segments,
+         impossible to miss with the pointer. */
+      .sc-modes {
         flex: none;
         display: flex;
-        align-items: center;
-        height: 24px;
-        padding: 1px;
+        gap: 2px;
+        margin: 0 10px 6px;
+        padding: 2px;
         box-sizing: border-box;
         border: 1px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
-        border-radius: 7px;
+        border-radius: 8px;
         background: color-mix(in srgb, var(--dsw-alias-label-primary) 5%, transparent);
       }
-      .sc-modeBtn {
-        height: 20px;
-        padding: 0 7px;
-        border: 0;
-        border-radius: 5px;
-        background: transparent;
-        color: var(--dsw-alias-label-secondary);
-        font: inherit;
-        font-size: 11.5px;
-        line-height: 20px;
-        cursor: pointer;
-      }
-      .sc-modeBtn[aria-pressed='true'] {
-        background: color-mix(in srgb, var(--sc-calendar-accent) 16%, transparent);
-        color: var(--dsw-alias-label-primary);
-        font-weight: 600;
-      }
-      .sc-modeBtn:focus-visible {
-        outline: 2px solid var(--dsw-focus-ring-color, var(--sc-calendar-accent));
-        outline-offset: -1px;
-      }
-      .sc-today {
-        flex: none;
-        height: 28px;
+      .sc-seg {
+        flex: 1 1 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+        height: 26px;
         padding: 0 8px;
-        border: 0.5px solid var(--dsw-alias-border-l2, rgba(0, 0, 0, 0.1));
-        border-radius: 9px;
+        border: 0;
+        border-radius: 6px;
         background: transparent;
         color: var(--dsw-alias-label-secondary);
         font: inherit;
         font-size: 12px;
+        line-height: 1;
         cursor: pointer;
       }
-      .sc-today:disabled {
-        opacity: 0.45;
-        cursor: default;
+      .sc-seg[aria-pressed='true'] {
+        background: color-mix(in srgb, var(--sc-calendar-accent) 16%, transparent);
+        color: var(--dsw-alias-label-primary);
+        font-weight: 600;
+      }
+      .sc-seg:active {
+        background: color-mix(in srgb, var(--sc-calendar-accent) 26%, transparent);
+      }
+      .sc-seg:focus-visible {
+        outline: 2px solid var(--dsw-focus-ring-color, var(--sc-calendar-accent));
+        outline-offset: -1px;
+      }
+      .sc-navBtn.sc-hot,
+      .sc-today.sc-hot {
+        background: color-mix(in srgb, var(--dsw-alias-label-primary) 9%, transparent);
+        color: var(--dsw-alias-label-primary);
+      }
+      .sc-seg.sc-hot {
+        background: color-mix(in srgb, var(--dsw-alias-label-primary) 9%, transparent);
+        color: var(--dsw-alias-label-primary);
+      }
+      .sc-seg[aria-pressed='true'].sc-hot {
+        background: color-mix(in srgb, var(--sc-calendar-accent) 22%, transparent);
+      }
+      .sc-today {
+        flex: 1 1 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: auto;
+        min-height: 26px;
+        padding: 0 8px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: var(--dsw-alias-label-secondary);
+        font: inherit;
+        font-size: 12px;
+        line-height: 1;
+        cursor: pointer;
       }
       .sc-weekRow {
         flex: none;
@@ -1329,9 +1476,16 @@ window.__ModuleLoader__.load({
       .sc-cellToday:not(.sc-cellFilled) {
         border-color: color-mix(in srgb, var(--sc-calendar-accent) 62%, transparent);
       }
+      /* Today's number stays plain text — white in the dark theme, ink in the
+         light one — because the brand blue on the card was hard to read. The
+         underline carries the "today" mark instead. */
       .sc-cellToday .sc-dayNum {
-        color: var(--sc-calendar-accent);
-        font-weight: 600;
+        color: var(--dsw-alias-label-primary);
+        font-weight: 700;
+        text-decoration: underline;
+        text-decoration-color: color-mix(in srgb, var(--sc-calendar-accent) 70%, transparent);
+        text-decoration-thickness: 1.5px;
+        text-underline-offset: 2px;
       }
       .sc-cellSelected {
         background: color-mix(in srgb, var(--sc-calendar-accent) 16%, transparent);
