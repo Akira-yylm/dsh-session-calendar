@@ -1,6 +1,6 @@
 {
   "name": "@akira-yylm/session-calendar",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "description": "Session calendar: a month calendar beside the sidebar listing every session created on the selected day, grouped by workspace.",
   "license": "MIT",
@@ -13,8 +13,16 @@
   "bugs": {
     "url": "https://github.com/Akira-yylm/dsh-session-calendar/issues"
   },
-  "keywords": ["dsh", "dsh-bundle", "dsh-plugin", "session", "calendar"],
-  "engines": { "dsh": ">=0.2.2-rc.5 <0.3.0" },
+  "keywords": [
+    "dsh",
+    "dsh-bundle",
+    "dsh-plugin",
+    "session",
+    "calendar"
+  ],
+  "engines": {
+    "dsh": ">=0.2.2-rc.5 <0.3.0"
+  },
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -27,12 +35,15 @@
     "cordis.patch.yml",
     "icon.svg",
     "README.md",
+    "README.en.md",
     "CHANGELOG.md",
     "LICENSE",
     "locale/*.json"
   ],
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,

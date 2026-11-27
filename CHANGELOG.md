@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2
+
+- 文档：补齐英文 `README.en.md`、非官方声明，以及安装（GitHub / 命令行 / 本地目录）、升级、数据与隐私、兼容性、开发说明；安装示例改用本仓库地址与 tag。
+- 文档：补充「`client.js` 注册 id 必须等于包名」的注意事项。
+
+
 ## 1.0.1
 
 - 修复：客户端模块注册用的 id 仍是旧包名 `@local/session-calendar`，与包名（也是 boot entry 的 id）不一致，导致从 GitHub 安装后界面上不出现「会话日历」按钮——Host 半边（创建时间接口）一直正常。现改为 `@akira-yylm/session-calendar`。

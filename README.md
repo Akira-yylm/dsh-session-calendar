@@ -1,5 +1,7 @@
 # 会话日历 · Session calendar
 
+> 非官方（unofficial）DeepSeek Harness 插件，与 DeepSeek 官方无关。English → [README.en.md](README.en.md)
+
 在 DSH 左侧导航「免费会话」下方增加一个同款按钮，点开后会在左侧栏右边弹出小窗日历。选中某一天，就能看到**那一天创建的全部会话**，并按它们各自所属的**工作区分组**排列，和左侧栏的会话属于同一个工作区结构；点任意一条直接打开该会话。
 
 ## 怎么用
@@ -12,36 +14,74 @@
 6. 点某条会话即在右侧对话区打开它，小窗自动关闭。
 7. 关掉小窗：再点一次按钮、点小窗外面、按 `Esc`，或改变窗口大小。
 
-## 数据与限制
+## 安装
 
-- **只新增一个宿主只读接口**：`GET /dsh-session-calendar/created.json`，由会话持久层（`sessionPersistence.list()`）读出每个会话的 `createdAt`（创建时间）。它不打开会话日志正文、不写任何文件。
-- 会话标题、所属工作区、工作区顺序与归档状态都取自页面已加载的会话/工作区数据，因此和左侧栏保持一致，不需要额外复制一份。
+需要在 DSH 0.2.2-rc.5 或更高的 0.2.x 上使用。
+
+### 从 GitHub 安装（推荐）
+
+1. 打开 DSH 侧栏 **插件** → **添加插件**。
+2. 粘贴 `github:Akira-yylm/dsh-session-calendar#<40 位完整 commit SHA>`，点安装。
+3. 装好后插件默认启用；页面提示 `restart-required` 时重启 DSH，再刷新页面。
+
+固定完整 commit 才能被 Plugin Manager 识别为「可更新」的 Git 插件；写 tag（如 `#v1.0.2`）或分支名也能装，但不会被识别为可更新。某个版本对应的完整 SHA 可以用 `git rev-parse v1.0.2` 查到。
+
+### 用命令安装
+
+```sh
+dsh plugin --profile <profile> add "github:Akira-yylm/dsh-session-calendar#v1.0.2"
+```
+
+### 从本地目录安装
+
+`git clone` 本仓库后，在 **添加插件** 里选择该目录（本地目录会被 link 安装）。改完代码刷新页面即生效，适合自己改代码时用。
+
+## 升级
+
+第三方 Git 插件没有一键更新：换新版本 = **移除旧版 → 用新 commit 重新装**。
+
+> 若以后发布到 npm，插件页会出现 Versions 区，可直接点 Update。
+
+## 数据与隐私
+
+- 只新增一个同 origin 的**只读**宿主接口：`GET /dsh-session-calendar/created.json`，由会话持久层（`sessionPersistence.list()`）读出每个会话的 `createdAt`（创建时间）。
+- 不打开会话日志正文，不写任何文件，不发外网请求，不上传任何数据。
+- 会话标题、工作区、排序与归档状态都取自页面已有的会话/工作区数据，不额外复制一份。
+- 数据不出本机；卸载后无残留：本插件不创建配置文件、缓存或数据库。
+
+## 限制
+
 - 日期按**浏览器本地时区**划分（例如 Asia/Shanghai），不是 UTC；会话按**创建**日期归档，今天继续聊的旧会话仍留在它创建的那一天。
 - 与左侧栏一致地隐藏：**子代理会话**、**空白会话**、**已归档会话**。
 - 不属于任何已注册工作区的会话（例如目录已从工作区列表移除）会按文件夹名单独成组。
 - 月历只显示当月日期（相邻月份留空），翻月会自动落到该月最早有会话的一天。
 - 窗口很矮时会改为整张卡片滚动，窗口很窄时卡片会收窄并可能盖住左侧栏，此时用卡片右上角的关闭按钮收起。
 - 入口挂在「新会话」这一行的插槽里，所以当 DSH 自己隐藏该行时（例如当前会话不允许新建会话），「会话日历」按钮也会一起隐藏。
-- 数据不出本机：不发网络请求（只请求本机同一 origin 的上述接口），不上传、不改写会话内容。
 
-## 关掉插件后
+## 关掉或卸载后
 
 「会话日历」按钮与小窗消失。DSH 的会话、工作区、会话顺序、归档状态都不受影响；菜单元数据里也不会留下任何东西。
 
-## 安装
+## 兼容性
 
-**从 GitHub 安装（无需构建）**：
+- 在 **DSH 0.2.2-rc.5（macOS 桌面端）** 实测；包内声明 `engines.dsh: >=0.2.2-rc.5 <0.3.0`，超出范围 DSH 会拒绝安装或升级。
+- 纯 Web UI + 一个只读 Host 路由，不依赖操作系统；Windows / Linux 未实测。
+- 与官方插件无冲突：只插入自己的 `session-calendar` 行，不覆盖任何官方 row。
 
-```sh
-dsh plugin --profile <profile> add github:Akira-yylm/dsh-session-calendar#v1.0.1
-```
+## 开发
 
-装完重启 DSH。也可以在 DSH 设置 → **插件** → **添加插件** 里粘贴同一个地址。
+| 文件 | 作用 |
+|---|---|
+| `index.js` | Host 半边：注册只读路由 |
+| `client.js` | Client 半边：侧栏入口按钮 + `shell.overlay` 小窗月历 |
+| `cordis.patch.yml` | 插入 `session-calendar` 行 |
+| `locale/zh.json`、`locale/en.json` | 插件页标题与描述 |
+| `icon.svg` | 36×36 透明底图标 |
 
-本地开发时直接选择本目录即可（按 `link:` 方式装载）。
+注意：`client.js` 里的 `window.__ModuleLoader__.load({ id })` 必须与包名完全一致，否则 Host 正常但界面不出现。
 
-要求 DSH `>=0.2.2-rc.5 <0.3.0`。
+本地 link 安装时，改完刷新页面即可看到客户端改动；Host 侧改动需要重启 DSH。
 
-## 许可
+## License
 
-MIT
+[MIT](LICENSE) © 2026 Akira-yylm
