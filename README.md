@@ -33,7 +33,7 @@
 **从 GitHub 安装（无需构建）**：
 
 ```sh
-dsh plugin --profile <profile> add github:Akira-yylm/dsh-session-calendar#v1.0.0
+dsh plugin --profile <profile> add github:Akira-yylm/dsh-session-calendar#v1.0.1
 ```
 
 装完重启 DSH。也可以在 DSH 设置 → **插件** → **添加插件** 里粘贴同一个地址。

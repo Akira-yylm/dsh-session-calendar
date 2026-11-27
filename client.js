@@ -28,7 +28,7 @@
  */
 
 window.__ModuleLoader__.load({
-  id: '@local/session-calendar',
+  id: '@akira-yylm/session-calendar',
   factory(require) {
     const React = require('react')
     const h = React.createElement

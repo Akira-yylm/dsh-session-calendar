@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1
+
+- 修复：客户端模块注册用的 id 仍是旧包名 `@local/session-calendar`，与包名（也是 boot entry 的 id）不一致，导致从 GitHub 安装后界面上不出现「会话日历」按钮——Host 半边（创建时间接口）一直正常。现改为 `@akira-yylm/session-calendar`。
+
+
 ## 1.0.0
 
 - 新增「会话日历」入口：左侧导航「免费会话」下方第三个入口，折叠成细栏时显示图标。
