@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Session calendar",
+    "description": "Adds a 'Session calendar' row of the same style just below the 'Free session' row in the left sidebar; it opens a small month calendar beside the sidebar, and the sessions created on the selected day are listed grouped by their own workspaces, with a click opening that session. Entry: the 'Session calendar' row in the left sidebar; inside the calendar, use ‹ › to page months, 'Today' to return, and the × at the top right to close. Usage: click a date, then read the day's sessions grouped in sidebar order (title plus creation time) below the grid; click any row to open it. Re-clicking the row, clicking outside, or pressing Esc also dismisses it. Turning the plugin off removes the row and the window and leaves DSH sessions, workspaces, and their order untouched. Data: reads only the creation times from this machine's session logs; titles and grouping come from the page's existing session and workspace data, nothing is uploaded, and no session is written; days follow the browser's local time zone, sessions stay on the day they were created, and subagent, blank, and archived sessions are hidden by the same rules the sidebar uses; the entry follows the New-session row's visibility."
+  }
+}

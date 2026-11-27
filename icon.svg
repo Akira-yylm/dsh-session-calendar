@@ -1,0 +1,8 @@
+<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Session calendar">
+  <rect x="5.6" y="8.6" width="24.8" height="21" rx="4.6" stroke="#4D6BFE" stroke-width="2.4"/>
+  <path d="M7.1 15.2h21.8" stroke="#4D6BFE" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M12.6 5.9v4.3M23.4 5.9v4.3" stroke="#4D6BFE" stroke-width="2.2" stroke-linecap="round"/>
+  <rect x="15.3" y="19.3" width="5.4" height="5.4" rx="1.6" fill="#4D6BFE"/>
+  <circle cx="11.1" cy="22" r="1.35" fill="#A9B8FF"/>
+  <circle cx="24.9" cy="22" r="1.35" fill="#A9B8FF"/>
+</svg>

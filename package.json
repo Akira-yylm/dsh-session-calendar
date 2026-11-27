@@ -1,0 +1,46 @@
+{
+  "name": "@akira-yylm/session-calendar",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Session calendar: a month calendar beside the sidebar listing every session created on the selected day, grouped by workspace.",
+  "license": "MIT",
+  "author": "Akira-yylm",
+  "homepage": "https://github.com/Akira-yylm/dsh-session-calendar#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Akira-yylm/dsh-session-calendar.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Akira-yylm/dsh-session-calendar/issues"
+  },
+  "keywords": ["dsh", "dsh-bundle", "dsh-plugin", "session", "calendar"],
+  "engines": { "dsh": ">=0.2.2-rc.5 <0.3.0" },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "locale/*.json"
+  ],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  }
+}

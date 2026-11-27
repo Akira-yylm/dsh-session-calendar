@@ -1,0 +1,4 @@
+- insert:
+    - id: session-calendar
+      name: '@akira-yylm/session-calendar'
+      config: {}
